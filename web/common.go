@@ -34,14 +34,6 @@ func renderJSON(w http.ResponseWriter, v interface{}) {
 func renderStatic(w http.ResponseWriter, r *http.Request, target string) {
 	cleaned := path.Clean(target)
 	basePath := yui.GetExecutablePath()
-	fp := path.Join(basePath, "web", "static", cleaned)
-	cleanedFp := path.Clean(fp)
-	http.ServeFile(w, r, cleanedFp)
-}
-
-func renderHtml(w http.ResponseWriter, r *http.Request, target string) {
-	cleaned := path.Clean(target)
-	basePath := yui.GetExecutablePath()
 	fp := path.Join(basePath, "web", "html", cleaned)
 	cleanedFp := path.Clean(fp)
 	http.ServeFile(w, r, cleanedFp)

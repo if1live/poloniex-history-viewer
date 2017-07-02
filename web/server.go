@@ -2,6 +2,7 @@ package web
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"path"
 	"strconv"
@@ -53,10 +54,14 @@ func NewServer(addr string, port int, s yui.Settings) *Server {
 }
 
 func (s *Server) Run() {
-	http.HandleFunc("/poloniex-trade-history", handlerTradeHistories)
+	http.HandleFunc("/trade-history", handlerTradeHistories)
 	http.HandleFunc("/js/", handlerJS)
 	http.HandleFunc("/css/", handlerCSS)
 	http.HandleFunc("/private.php", handlerPrivateAPI)
+
+	addr := s.addr + ":" + strconv.Itoa(s.port)
+	fmt.Println("run server on", addr)
+	http.ListenAndServe(addr, nil)
 }
 
 func (s *Server) Close() {
@@ -75,7 +80,7 @@ func handlerCSS(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlerTradeHistories(w http.ResponseWriter, r *http.Request) {
-	renderHtml(w, r, "trade_history.html")
+	renderStatic(w, r, "trade_history.html")
 }
 
 func handler_returnPaginatedTradeHistory(w http.ResponseWriter, r *http.Request) {
