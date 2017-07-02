@@ -97,27 +97,20 @@ func handler_returnPaginatedTradeHistory(w http.ResponseWriter, r *http.Request)
 
 	rows := s.PaginateTradeHistory(startTime, endTime, page, tradesPerPage, typeval)
 
-	w.Write([]byte("["))
-
 	// first : atLeastOne
+	atLeastOne := ""
 	if len(rows) > 0 {
-		w.Write([]byte("1"))
+		atLeastOne = "1"
 	} else {
-		w.Write([]byte("0"))
+		atLeastOne = "0"
 	}
 
-	if len(rows) > 0 {
-		w.Write([]byte(","))
-		for i, r := range rows {
-			data, _ := json.Marshal(r)
-			w.Write(data)
-
-			if i < len(rows)-1 {
-				w.Write([]byte(","))
-			}
-		}
+	v := []interface{}{atLeastOne}
+	for _, r := range rows {
+		v = append(v, r)
 	}
-	w.Write([]byte("]"))
+	data, _ := json.Marshal(v)
+	w.Write(data)
 }
 
 func handler_returnPersonalTradeHistory(w http.ResponseWriter, r *http.Request) {
