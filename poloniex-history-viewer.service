@@ -1,0 +1,13 @@
+# https://www.reddit.com/r/golang/comments/35v5bm/best_way_to_run_go_server_as_a_daemon/
+# /etc/systemd/system/kanae.service 으로 symlink
+
+[Unit]
+Description=poloniex-lending-bot
+
+[Service]
+ExecStart=/home/irina/coin/kanae/kanae -cmd svr -port 25002
+WorkingDirectory=/home/irina/coin/kanae
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
