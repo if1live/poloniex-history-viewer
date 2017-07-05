@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>poloniex history viewer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://unpkg.com/purecss@1.0.0/build/pure-min.css" integrity="sha384-nn4HPE8lTHyVtfCBi5yW9d20FjT8BJwUXyWZT9InLYax14RDjBj46LmSztkmNP9w" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/main.css">
+
+  </head>
+
+  <body>
+    <h1>poloniex history viewer</h1>
+    <h2>histories</h2>
+    <ol>
+      <li><a href="/tradeHistory">trade history</a></li>
+      <li><a href="/depositHistory">deposit history</a></li>
+      <li><a href="/balances">balances</a></li>
+    </ol>
+
+    <h2>sync</h2>
+    <div>
+      last trade sync : {{ .ExchangeSync.GetLastTime }}
+      <br/>
+      <button type="button" class="pure-button btn-sync-exchange">sync exchange</button>
+    </div>
+
+    <div>
+      last lending sync : {{ .LendingSync.GetLastTime }}
+      <br/>
+      <button type="button" class="pure-button btn-sync btn-sync-lending">sync lending</button>
+    </div>
+
+    <div>
+      last balance sync : {{ .BalanceSync.GetLastTime }}
+      <br/>
+      <button type="button" class="pure-button btn-sync btn-sync-balance">sync balance</button>
+    </div>
+
+    <script src="/static/main.js"></script>
+  </body>
+</html>

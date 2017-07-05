@@ -1,14 +1,15 @@
 package web
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"path"
 	"strconv"
-	"time"
 
+	"github.com/if1live/poloniex-history-viewer/balances"
+	"github.com/if1live/poloniex-history-viewer/exchanges"
 	"github.com/if1live/poloniex-history-viewer/histories"
+	"github.com/if1live/poloniex-history-viewer/lendings"
 	"github.com/if1live/poloniex-history-viewer/yui"
 	"github.com/thrasher-/gocryptotrader/exchanges/poloniex"
 )
@@ -54,10 +55,21 @@ func NewServer(addr string, port int, s yui.Settings) *Server {
 }
 
 func (s *Server) Run() {
-	http.HandleFunc("/trade-history", handlerTradeHistories)
+	http.HandleFunc("/tradeHistory", handlerTradeHistory)
+	http.HandleFunc("/depositHistory", handlerDepositHistory)
+	http.HandleFunc("/balances", handlerBalances)
+
+	http.HandleFunc("/", handlerIndex)
 	http.HandleFunc("/js/", handlerJS)
 	http.HandleFunc("/css/", handlerCSS)
 	http.HandleFunc("/private.php", handlerPrivateAPI)
+	http.HandleFunc("/private", handlerPrivateAPI)
+
+	http.HandleFunc("/sync/balance", handlerSyncBalance)
+	http.HandleFunc("/sync/exchange", handlerSyncExchange)
+	http.HandleFunc("/sync/lending", handlerSyncLending)
+
+	http.HandleFunc("/static/", handlerStatic)
 
 	addr := s.addr + ":" + strconv.Itoa(s.port)
 	fmt.Println("run server on", addr)
@@ -68,74 +80,50 @@ func (s *Server) Close() {
 	s.db.Close()
 }
 
+func handlerStatic(w http.ResponseWriter, r *http.Request) {
+	targetPath := r.URL.Path[len("/static/"):]
+	renderStatic(w, r, targetPath)
+}
+
 func handlerJS(w http.ResponseWriter, r *http.Request) {
 	targetPath := r.URL.Path[len("/js/"):]
 	targetPath = path.Join("js", targetPath)
-	renderStatic(w, r, targetPath)
+	renderPoloniexStatic(w, r, targetPath)
 }
 func handlerCSS(w http.ResponseWriter, r *http.Request) {
 	targetPath := r.URL.Path[len("/css/"):]
 	targetPath = path.Join("css", targetPath)
-	renderStatic(w, r, targetPath)
+	renderPoloniexStatic(w, r, targetPath)
 }
 
-func handlerTradeHistories(w http.ResponseWriter, r *http.Request) {
-	renderStatic(w, r, "trade_history.html")
+func handlerTradeHistory(w http.ResponseWriter, r *http.Request) {
+	renderPoloniexStatic(w, r, "trade_history.html")
 }
 
-func handler_returnPaginatedTradeHistory(w http.ResponseWriter, r *http.Request) {
-	s := histories.NewAPI(svr.db.GetORM())
+func handlerDepositHistory(w http.ResponseWriter, r *http.Request) {
+	renderPoloniexStatic(w, r, "deposit_history.html")
+}
 
-	start, _ := strconv.ParseInt(r.FormValue("start"), 10, 64)
-	end, _ := strconv.ParseInt(r.FormValue("end"), 10, 64)
-	page, _ := strconv.Atoi(r.FormValue("page"))
-	tradesPerPage, _ := strconv.Atoi(r.FormValue("tradesPerPage"))
-	typeval, _ := strconv.Atoi(r.FormValue("type"))
+func handlerBalances(w http.ResponseWriter, r *http.Request) {
+	renderPoloniexStatic(w, r, "balances.html")
+}
 
-	startTime := time.Unix(start, 0)
-	endTime := time.Unix(end, 0)
-
-	rows := s.PaginateTradeHistory(startTime, endTime, page, tradesPerPage, typeval)
-
-	// first : atLeastOne
-	atLeastOne := ""
-	if len(rows) > 0 {
-		atLeastOne = "1"
-	} else {
-		atLeastOne = "0"
+func handlerIndex(w http.ResponseWriter, r *http.Request) {
+	type Context struct {
+		ExchangeSync *exchanges.Sync
+		LendingSync  *lendings.Sync
+		BalanceSync  *balances.Sync
+	}
+	ctx := Context{
+		ExchangeSync: svr.db.MakeExchangeSync(nil),
+		LendingSync:  svr.db.MakeLendingSync(nil),
+		BalanceSync:  svr.db.MakeBalanceSync(nil),
 	}
 
-	v := []interface{}{atLeastOne}
-	for _, r := range rows {
-		v = append(v, r)
-	}
-	data, _ := json.Marshal(v)
-	w.Write(data)
-}
-
-func handler_returnPersonalTradeHistory(w http.ResponseWriter, r *http.Request) {
-	s := histories.NewAPI(svr.db.GetORM())
-
-	start, _ := strconv.ParseInt(r.FormValue("start"), 10, 64)
-	end, _ := strconv.ParseInt(r.FormValue("end"), 10, 64)
-
-	startTime := time.Unix(start, 0)
-	endTime := time.Unix(end, 0)
-
-	retval := s.PersonalTradeHistory(startTime, endTime)
-	data, _ := json.Marshal(retval)
-	w.Write(data)
-}
-
-func handlerPrivateAPI(w http.ResponseWriter, r *http.Request) {
-	cmd := r.FormValue("command")
-
-	if cmd == "returnPaginatedTradeHistory" {
-		handler_returnPaginatedTradeHistory(w, r)
-		return
-
-	} else if cmd == "returnPersonalTradeHistory" {
-		handler_returnPersonalTradeHistory(w, r)
+	err := renderTemplate(w, "index.html", ctx)
+	if err != nil {
+		renderErrorJSON(w, err, http.StatusInternalServerError)
 		return
 	}
+
 }

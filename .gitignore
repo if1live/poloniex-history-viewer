@@ -19,5 +19,7 @@
 config.yaml
 poloniex-history-viewer
 
-
+## poloniex html
 trade_history.html
+deposit_history.html
+balances.html

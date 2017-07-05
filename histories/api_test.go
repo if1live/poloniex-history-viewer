@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/if1live/poloniex-history-viewer/balances"
 	"github.com/if1live/poloniex-history-viewer/exchanges"
 	"github.com/if1live/poloniex-history-viewer/lendings"
 	"github.com/stretchr/testify/assert"
@@ -189,4 +190,75 @@ func Test_NewPersonalTradeHistoryFromLending(t *testing.T) {
 	v := NewPersonalTradeHistoryFromLending(&r)
 	assert.Equal(t, expected, v)
 
+}
+
+func Test_NewWithdrawalHistory(t *testing.T) {
+	t.Parallel()
+
+	expected := WithdrawalHistory{
+		WithdrawalNumber: 5485728,
+		Currency:         "BTC",
+		Address:          "1FfeRCpZNt8bskfqS7DCULE1JAZC32w9WN",
+		Amount:           "0.01425148",
+		Fee:              "0.00010000",
+		Timestamp:        1499090630,
+		Status:           "COMPLETE: 9010da9ee9eb67f0dd632fac6a768156aba1140e7d45e0dfee202e65b3651f92",
+		IPAddress:        "1.2.3.4",
+	}
+
+	timestamp, err := time.Parse("2006-01-02 15:04:05-07:00", "2017-07-03 23:03:50+09:00")
+	if err != nil {
+		t.Errorf("time.Parse: %v", err)
+	}
+
+	r := balances.Transaction{
+		Type:             "withdrawal",
+		WithdrawalNumber: 5485728,
+		Currency:         "BTC",
+		Address:          "1FfeRCpZNt8bskfqS7DCULE1JAZC32w9WN",
+		Amount:           0.01425148,
+		Confirmations:    0,
+		TransactionID:    "",
+		Timestamp:        timestamp,
+		Status:           "COMPLETE: 9010da9ee9eb67f0dd632fac6a768156aba1140e7d45e0dfee202e65b3651f92",
+		IPAddress:        "1.2.3.4",
+	}
+	v := NewWithdrawalHistory(&r)
+
+	assert.Equal(t, expected, v)
+}
+
+func Test_NewDepositHistory(t *testing.T) {
+	t.Parallel()
+
+	expected := DepositHistory{
+		Currency:      "BTC",
+		Address:       "13ie6ptXxdwpNkSTwowXzX3AsHUvKRic8v",
+		Amount:        "0.30732863",
+		Confirmations: 1,
+		Txid:          "f2fd5472dc596c3e6f6b377f67a0cade5e65e491758907b937aa3c5c50055aed",
+		Timestamp:     1497314214,
+		Status:        "COMPLETE",
+	}
+
+	timestamp, err := time.Parse("2006-01-02 15:04:05-07:00", "2017-06-13 09:36:54+09:00")
+	if err != nil {
+		t.Errorf("time.Parse: %v", err)
+	}
+
+	r := balances.Transaction{
+		Type:             "deposit",
+		WithdrawalNumber: 0,
+		Currency:         "BTC",
+		Address:          "13ie6ptXxdwpNkSTwowXzX3AsHUvKRic8v",
+		Amount:           0.30732863,
+		Confirmations:    1,
+		TransactionID:    "f2fd5472dc596c3e6f6b377f67a0cade5e65e491758907b937aa3c5c50055aed",
+		Timestamp:        timestamp,
+		Status:           "COMPLETE",
+		IPAddress:        "",
+	}
+	v := NewDepositHistory(&r)
+
+	assert.Equal(t, expected, v)
 }

@@ -1,0 +1,4 @@
+/* fix pure.io bug */
+.pure-menu-item {
+    height: auto;
+}

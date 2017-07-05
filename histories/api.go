@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/if1live/poloniex-history-viewer/balances"
 	"github.com/if1live/poloniex-history-viewer/exchanges"
 	"github.com/if1live/poloniex-history-viewer/lendings"
 	"github.com/if1live/poloniex-history-viewer/yui"
@@ -35,11 +36,20 @@ const (
 // page=1
 // tradesPerPage=50
 // type=0
-func (s *API) PaginateTradeHistory(start, end time.Time, page, tadePerPage int, apiType int) []TradeHistory {
+func (s *API) PaginateTradeHistory(start, end time.Time, page, tradesPerPage int, apiType int) []TradeHistory {
+	limit := tradesPerPage
+	offset := 0
+
+	if page > 1 {
+		offset = (page-1)*(tradesPerPage) - 1
+		limit = tradesPerPage + 1
+	}
+
 	if apiType == tradeHistoryTypeLoadEarnings {
 		var rows []lendings.Lending
 		q := s.db.Where("close between ? and ?", start, end)
-		q.Order("close desc").Find(&rows)
+		q = q.Order("close desc")
+		q = q.Limit(limit).Offset(offset).Find(&rows)
 
 		histories := make([]TradeHistory, len(rows))
 		for i, r := range rows {
@@ -58,7 +68,8 @@ func (s *API) PaginateTradeHistory(start, end time.Time, page, tadePerPage int, 
 			q = q.Where("type = ?", exchanges.ExchangeSell)
 		case tradeHistoryTypeBuysAndSells:
 		}
-		q.Order("date desc").Find(&rows)
+		q = q.Order("date desc").Find(&rows)
+		q = q.Limit(limit).Offset(offset).Find(&rows)
 
 		histories := make([]TradeHistory, len(rows))
 		for i, r := range rows {
@@ -66,6 +77,37 @@ func (s *API) PaginateTradeHistory(start, end time.Time, page, tadePerPage int, 
 		}
 		return histories
 	}
+}
+
+// https://poloniex.com/private.php
+// command=returnNumberOfPagesInTradeHistory
+// start=0
+// end=1917895987
+// tradesPerPage=50
+// type=2
+func (s *API) NumberOfPagesInTradeHistory(start, end time.Time, tradesPerPage int, apiType int) int {
+	rowcount := 0
+	if apiType == tradeHistoryTypeLoadEarnings {
+		q := s.db.Model(&lendings.Lending{}).Where("close between ? and ?", start, end)
+		q.Order("close desc").Count(&rowcount)
+
+	} else {
+		q := s.db.Model(&exchanges.Exchange{}).Where("date between ? and ?", start, end)
+		switch apiType {
+		case tradeHistoryTypeBuysOnly:
+			q = q.Where("type = ?", exchanges.ExchangeBuy)
+		case tradeHistoryTypeSellsOnly:
+			q = q.Where("type = ?", exchanges.ExchangeSell)
+		case tradeHistoryTypeBuysAndSells:
+		}
+		q.Order("date desc").Count(&rowcount)
+	}
+
+	if rowcount == 0 {
+		return 0
+	}
+	page := ((rowcount - 1) / tradesPerPage) + 1
+	return page
 }
 
 // https://poloniex.com/private.php
@@ -127,6 +169,40 @@ func (s *API) PersonalTradeHistory(start, end time.Time) map[string][]PersonalTr
 	return retval
 }
 
+// https://poloniex.com/
+// private
+// command=returnDepositsAndWithdrawalsMobile
+func (s *API) DepositsAndWithdrawals() {
+}
+
+// https://poloniex.com/
+// private
+// command=returnWithdrawalsDeposits
+// limit=50
+func (s *API) WithdrawalsDeposits(limit int) WithdrawalDepositHistory {
+	var rows []balances.Transaction
+	s.db.Order("timestamp desc").Find(&rows)
+
+	deposits := []DepositHistory{}
+	withdrawals := []WithdrawalHistory{}
+	for _, r := range rows {
+		if r.Type == balances.TypeDeposit {
+			deposits = append(deposits, NewDepositHistory(&r))
+		} else if r.Type == balances.TypeWithdrawal {
+			withdrawals = append(withdrawals, NewWithdrawalHistory(&r))
+		}
+	}
+
+	limitWithdraw := "2000.00000000"
+	remaining := "1234.12345678"
+	return WithdrawalDepositHistory{
+		Deposits:    deposits,
+		Withdrawals: withdrawals,
+		Limit:       limitWithdraw,
+		Remaining:   remaining,
+	}
+}
+
 type TradeHistory struct {
 	CurrencyPair string `json:"currencyPair"`
 	Date         string `json:"date"`
@@ -171,6 +247,68 @@ func NewTradeHistoryFromLending(r *lendings.Lending) TradeHistory {
 		Rate:         fmt.Sprintf("%.4f%%", r.Rate*100),
 		Total:        yui.ToFloatStr(r.Interest),
 	}
+}
+
+type DepositHistory struct {
+	Currency      string `json:"currency"`
+	Address       string `json:"address"`
+	Amount        string `json:"amount"`
+	Confirmations int    `json:"confirmations"`
+	Txid          string `json:"txid"`
+	Timestamp     int64  `json:"timestamp"`
+	Status        string `json:"status"`
+}
+
+func NewDepositHistory(r *balances.Transaction) DepositHistory {
+	return DepositHistory{
+		Currency:      r.Currency,
+		Address:       r.Address,
+		Amount:        yui.ToFloatStr(r.Amount),
+		Confirmations: r.Confirmations,
+		Txid:          r.TransactionID,
+		Timestamp:     r.Timestamp.Unix(),
+		Status:        r.Status,
+	}
+}
+
+type WithdrawalHistory struct {
+	WithdrawalNumber int64  `json:"withdrawalNumber"`
+	Currency         string `json:"currency"`
+	Address          string `json:"address"`
+	Amount           string `json:"amount"`
+	Fee              string `json:"fee"`
+	Timestamp        int64  `json:"timestamp"`
+	Status           string `json:"status"`
+	IPAddress        string `json:"ipAddress"`
+}
+
+func NewWithdrawalHistory(r *balances.Transaction) WithdrawalHistory {
+	// currency-fee table
+	feeTable := map[string]float64{
+		"BTC": 0.0001,
+	}
+	fee, ok := feeTable[r.Currency]
+	if !ok {
+		fee = -1
+	}
+
+	return WithdrawalHistory{
+		WithdrawalNumber: r.WithdrawalNumber,
+		Currency:         r.Currency,
+		Address:          r.Address,
+		Amount:           yui.ToFloatStr(r.Amount),
+		Fee:              yui.ToFloatStr(fee),
+		Timestamp:        r.Timestamp.Unix(),
+		Status:           r.Status,
+		IPAddress:        r.IPAddress,
+	}
+}
+
+type WithdrawalDepositHistory struct {
+	Deposits    []DepositHistory    `json:"deposits"`
+	Withdrawals []WithdrawalHistory `json:"withdrawals"`
+	Limit       string              `json:"limit"`
+	Remaining   string              `json:"remaining"`
 }
 
 type PersonalTradeHistory struct {

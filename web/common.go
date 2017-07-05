@@ -2,6 +2,8 @@ package web
 
 import (
 	"encoding/json"
+	"html/template"
+	"io"
 	"net/http"
 	"path"
 
@@ -31,10 +33,29 @@ func renderJSON(w http.ResponseWriter, v interface{}) {
 	w.Write(data)
 }
 
-func renderStatic(w http.ResponseWriter, r *http.Request, target string) {
+func renderPoloniexStatic(w http.ResponseWriter, r *http.Request, target string) {
 	cleaned := path.Clean(target)
 	basePath := yui.GetExecutablePath()
 	fp := path.Join(basePath, "web", "html", cleaned)
 	cleanedFp := path.Clean(fp)
 	http.ServeFile(w, r, cleanedFp)
+}
+
+func renderStatic(w http.ResponseWriter, r *http.Request, target string) {
+	cleaned := path.Clean(target)
+	basePath := yui.GetExecutablePath()
+	fp := path.Join(basePath, "web", "static", cleaned)
+	cleanedFp := path.Clean(fp)
+	http.ServeFile(w, r, cleanedFp)
+}
+
+func renderTemplate(w io.Writer, tplfile string, v interface{}) error {
+	basePath := yui.GetExecutablePath()
+	fp := path.Join(basePath, "web", "templates", tplfile)
+	tpl, err := template.New(tplfile).ParseFiles(fp)
+	if err != nil {
+		return err
+	}
+	return tpl.Execute(w, v)
+
 }
